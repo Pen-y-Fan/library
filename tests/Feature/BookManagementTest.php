@@ -72,7 +72,7 @@ class BookManagementTest extends TestCase
     }
 
     /** @test */
-    public function a_new_author_is_automatically_added() :void
+    public function a_new_author_is_automatically_added(): void
     {
         $this->withoutExceptionHandling();
 
@@ -93,6 +93,6 @@ class BookManagementTest extends TestCase
         return [
             'title' => 'Cool Book Title',
             'author_id' => 'Victor',
-            ];
+        ];
     }
 }
