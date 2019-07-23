@@ -2644,11 +2644,735 @@ All tests are back green.
 
 ## 04 28:43 Test Driven Laravel - e04 - Book Checkout & Book Checkin Flow With TDD
 
-https://www.youtube.com/watch?v=CVKRBpBSXEw&list=PLpzy7FIRqpGAbkfdxo1MwOS9xjG3O3z1y&index=4
-https://youtu.be/CVKRBpBSXEw?t=11
-.
+Run all tests
+
+- Always start and end at green
+
+```txt
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+..........                                                        10 / 10 (100%)
+
+Time: 1.12 seconds, Memory: 22.00 MB
+
+OK (10 tests, 23 assertions)
+```
+
+A library needs to check out a book
+
+- Needs a book
+- user
+- Checkout time
+- Return time
+
+Create a test
+
+- Book reservations test
+
+```sh
+php artisan make:test BookReservationsTest
+```
+
+```text
+Test created successfully.
+```
+
+Open tests\Feature\\**BookReservationsTest.php**
+
+- Clear the test case
+- Create a new test method a_book_can_be_checked_out
+- a book can call a checkout method, passing in a user
+- or a user can checkout a book, passing in a book
+- Another way it to grab the authenticated user, however this can limit the function e.g. i librarian can't check out a book for a user
+- Avoid pivoting around the user object, as the user can do anything.
+- The test will
+  - Create a user object
+  - Create a book object
+  - Checkout a book, using a checkout method
+  - Assert the database has 1 record
+  - Assert the database user_id matches the data passed in
+  - Assert the database book_id matches the data passed in
+  - Assert the time stamp matches now
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Book;
+use App\User;
+
+class BookReservationsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @test */
+    public function a_book_can_be_checked_out(): void
+    {
+        $book = factory(Book::class)->create();
+        $user = factory(User::class)->create();
+
+        $book->checkout($user);
+
+        $this->assertCount(1, Reservation::all());
+        $this->assertEquals($user->id, Reservation::first()->user_id);
+        $this->assertEquals($book->id, Reservation::first()->book_id);
+        $this->assertEquals(now(), Reservation::first()->checked_out_at);
+    }
+}
+```
+
+Checking th test that has been created, it isn't a feature test, as it isn't hitting an endpoint.
+
+- Move the BookReservationTest into unit directory
+  - tests\\**Unit**\\BookReservationsTest.php
+- Rename the namespace Tests\Unit
+
+```php
+// ...
+namespace Tests\Unit;
+// ...
+```
+
+Run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+InvalidArgumentException: Unable to locate factory with name [default] [App\Book].
+...
+```
+
+The Factory for Book hasn't been created
+
+- Create a new factory for Book using artisan
+- Use the -m option to pass in the Book model
+
+```sh
+php artisan make:factory BookFactory -m Book
+```
+
+```text
+Factory created successfully.
+```
+
+Open database\factories\\**BookFactory.php**
+
+- The factory has been created for the Book class.
+
+Open database\migrations\\**2019_05_06_120614_create_books_table.php**
+
+- Confirm the current fields:
+  - title
+  - author_id
+
+Back in **BookFactory.php**
+
+- Use faker to create some fake data
+  - The title can be a sentence
+  - The author_id
+    - could be just 1
+    - Or pass in a factory for Author (without creating the record)
+- Remember to import Author class
+
+```php
+<?php
+
+/* @var $factory \Illuminate\Database\Eloquent\Factory */
+
+use App\Book;
+use Faker\Generator as Faker;
+use App\Author;
+
+$factory->define(Book::class, function (Faker $faker) {
+    return [
+        'title' => $faker->sentence(),
+        'author_id' => factory(Author::class),
+    ];
+});
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+InvalidArgumentException: Unable to locate factory with name [default] [App\Author].
+...
+```
+
+The factory for Author hasn't been created
+
+- Create a factory, using artisan, for an Author
+
+```sh
+php artisan make:factory AuthorFactory -m Author
+```
+
+```text
+Factory created successfully.
+```
+
+Open the Author table, the see the required fields.
+
+- name
+- dob is nullable
+
+Open database\factories\\**AuthorFactory.php**
+
+- name can user faker name
+- dob can use carbon, today's date minus 10 years
+
+```php
+<?php
+
+/* @var $factory \Illuminate\Database\Eloquent\Factory */
+
+use App\Author;
+use Faker\Generator as Faker;
+
+$factory->define(Author::class, function (Faker $faker) {
+    return [
+        'name' => $faker->name(),
+        'dob' => now()->subYears(10),
+    ];
+});
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+BadMethodCallException: Call to undefined method App\Book::checkout()
+...
+```
+
+The method checkout is undefined, as it hasn't been created, yet
+
+- In the Book class
+  - create a new public method called checkout
+
+```php
+// ...
+public function checkout()
+{
+    // code
+}
+// ...
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+Error: Class 'Tests\Unit\Reservation' not found
+...
+```
+
+The Reservation model \[class\] doesn't exist
+
+- Create the model for Reservation
+  - use the -m for the migration
+
+```sh
+php artisan make:model Reservation -m
+```
+
+```text
+Created Migration: 2019_07_23_104204_create_reservations_table
+```
+
+Open the test tests\Unit\\**BookReservationsTest.php**
+
+- Import the Reservation model
+
+```php
+// ...
+use App\Reservation;
+// ...
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+Failed asserting that actual size 0 matches expected size 1.
+...
+```
+
+The data passed to checkout isn't being created in the database
+
+Open app\\**Book.php**
+
+- The checkout method needs:
+  - user_id based in the \$user's id
+  - checked_out_at which can be now()
+
+```php
+// ...
+public function checkout($user)
+{
+    $this->reservations()->create([
+        'user_id' => $user->id,
+        'checked_out_at' => now(),
+    ]);
+}
+// ...
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+BadMethodCallException: Call to undefined method App\Book::reservations()
+...
+```
+
+The reservations method hasn't been created, yet, still in the Book model:
+
+- Create a reservations public method
+- return the relationship hasMany Reservations
+
+```php
+// ...
+public function reservations()
+{
+    return $this->hasMany(Reservation::class);
+}
+// ...
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_checked_out
+Illuminate\Database\Eloquent\MassAssignmentException: Add [user_id] to fillable property to allow mass assignment on [App\Reservation].
+...
+```
+
+Mass assignment on Reservation. Open app\\**Reservation.php**
+
+- Add a fillable or guarded array
+
+```php
+// ...
+class Reservation extends Model
+{
+    protected $guarded = ['id'];
+}
+```
+
+Re-run the test
+
+```text
+...
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1 table reservations has no column named user_id
+...
+```
+
+The reservations table doesn't have a user_id field. Open the create reservations table database\migrations\\**2019_07_23_104204_create_reservations_table.php**
+
+- Add user_id field to the up method
+
+```php
+public function up()
+{
+    Schema::create('reservations', function (Blueprint $table) {
+        $table->bigIncrements('id');
+        $table->unsignedBigInteger('user_id'); // Add
+        $table->timestamps();
+    });
+}
+```
+
+Re-run the test
+
+```text
+...
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1 table reservations has no column named checked_out_at
+...
+```
+
+The reservations database has no field called checked_out_at, open database\migrations \\**2019_07_23_104204_create_reservations_table.php**
+
+- Add the checked_out_at field to the table, as a time stamp
+
+```php
+public function up()
+{
+    Schema::create('reservations', function (Blueprint $table) {
+        $table->bigIncrements('id');
+        $table->unsignedBigInteger('user_id');
+        $table->timestamp('checked_out_at'); // Add
+        $table->timestamps();
+    });
+}
+```
+
+Re-run the test
+
+```text
+...
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1 table reservations has no column named book_id
+...
+```
+
+The reservations database has no field called book_id, open database\migrations \\**2019_07_23_104204_create_reservations_table.php**
+
+- Add the book_id field to the table
+
+```php
+public function up()
+{
+    Schema::create('reservations', function (Blueprint $table) {
+        $table->bigIncrements('id');
+        $table->unsignedBigInteger('user_id');
+        $table->unsignedBigInteger('book_id'); // Add
+        $table->timestamp('checked_out_at');
+        $table->timestamps();
+    });
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 338 ms, Memory: 20.00 MB
+
+OK (1 test, 4 assertions)
+```
+
+The test is now green
+
+Next test is to return a book
+
+Open tests\Unit\\**BookReservationsTest.php**
+
+- copy the checkout test, as most of the code is the same
+- After the book is checked out add a checked in method
+- Update the book checked out test to book checked in
+
+```php
+/** @test */
+public function a_book_can_be_returned(): void // New test name
+{
+    $book = factory(Book::class)->create();
+    $user = factory(User::class)->create();
+
+    $book->checkout($user);
+
+    $book->checkin($user);  // Test a new method to checkin
+
+    $this->assertCount(1, Reservation::all());
+    $this->assertEquals($user->id, Reservation::first()->user_id);
+    $this->assertEquals($book->id, Reservation::first()->book_id);
+    $this->assertEquals(now(), Reservation::first()->checked_in_at); // Confirm the database check_in_at
+}
+```
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_returned
+BadMethodCallException: Call to undefined method App\Book::checkin()
+...
+```
+
+The checkin method doesn't exist. Open app\\**Book.php**
+
+- Create a new public method called checkin
+
+```php
+// ...
+public function checkin($user)
+{
+    // code
+}
+// ...
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_returned
+null does not match expected type "object".
+...
+```
+
+The line in the test is `$this->assertEquals(now(), Reservation::first()->checked_in_at);`
+
+To confirm this is the problem:
+
+- add a new assertNotNull test for \$this->assertNotNull(Reservation::first()->checked_in_at);
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_returned
+Failed asserting that null is not null.
+...
+```
+
+Open **Book.php**
+
+- Update the checkin method
+  - The reservation is a book that is checked out (the field is not null)
+  - But not checked in (The checked in field is null)
+- Update the reservation to make the book checked in.
+
+```php
+public function checkin($user)
+{
+    $reservation = $this->reservations()->where('user_id', $user->id)
+        ->whereNotNull('checked_out_at')
+        ->whereNull('checked_in_at')
+        ->first();
+
+    $reservation->update([
+        'checked_in_at' => now(),
+    ]);
+}
+```
+
+Re-run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::a_book_can_be_returned
+Failed asserting that null is not null.
+...
+```
+
+Currently checked_in_at filed doesn't exist in the table. Open create reservation table database\migrations\ **2019_07_23_104204_create_reservations_table.php**
+
+- Add the checked_in_at field
+
+```php
+public function up()
+{
+    Schema::create('reservations', function (Blueprint $table) {
+        $table->bigIncrements('id');
+        $table->unsignedBigInteger('user_id');
+        $table->unsignedBigInteger('book_id');
+        $table->timestamp('checked_out_at');
+        $table->timestamp('checked_in_at'); // Add
+        $table->timestamps();
+    });
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 301 ms, Memory: 20.00 MB
+
+OK (1 test, 5 assertions)
+```
+
+The test now passes green.
+
+Run all tests
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+............                                                      12 / 12 (100%)
+
+Time: 1.64 seconds, Memory: 24.00 MB
+
+OK (12 tests, 32 assertions)
+```
+
+The all pass green.
+
+There are two edge cases highlighted by the tutor.
+
+- If not checked out, then throw an exception
+- A user can checkout a book twice (check it out, return it and check out again)
+
+Open tests\Unit\ **BookReservationsTest.php**
+
+- Create a new test
+
+  - A user can checkout a book twice
+  - Copy the code from a_book_can_be_returned
+  - Update the test to check in the book, check it out and then back in
+  - Assert record 2 in the database has the user_id, book_id, that is has been checked in is null, checked out is now
+  - Checked the book back in again
+  - Check record 2 has been updated, checked in is not null and it has a checked in date of now
+
+```php
+/** @test */
+public function a_user_can_checkout_a_book_twice(): void
+{
+    $book = factory(Book::class)->create();
+    $user = factory(User::class)->create();
+
+    $book->checkout($user);
+    $book->checkin($user);
+
+    $book->checkout($user);
+
+    $this->assertCount(2, Reservation::all());
+    $this->assertEquals($user->id, Reservation::find(2)->user_id);
+    $this->assertEquals($book->id, Reservation::find(2)->book_id);
+    $this->assertNull(Reservation::find(2)->checked_in_at);
+    $this->assertEquals(now(), Reservation::find(2)->checked_out_at);
+
+    $book->checkin($user);
+
+    $this->assertCount(2, Reservation::all());
+    $this->assertEquals($user->id, Reservation::find(2)->user_id);
+    $this->assertEquals($book->id, Reservation::find(2)->book_id);
+    $this->assertNotNull(Reservation::find(2)->checked_in_at);
+    $this->assertEquals(now(), Reservation::find(2)->checked_in_at);
+}
+```
+
+Run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 655 ms, Memory: 20.00 MB
+
+OK (1 test, 10 assertions)
+```
+
+All assertions from the test pass
+
+Run all tests
+
+```text
+>vendor\bin\phpunit.bat
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.............                                                     13 / 13 (100%)
+
+Time: 596 ms, Memory: 24.00 MB
+
+OK (13 tests, 42 assertions)
+
+```
+
+They all pass.
+
+Open tests\Unit\ **BookReservationsTest.php**.
+
+- Create a new test if not checked out exception is thrown
+- Copy some of the code from the previous test to create a book and user
+- checkin the book (without it being checked out)
+- expectException from the Exception class
+
+```php
+/** @test */
+public function if_not_checked_out_exception_is_thrown(): void
+{
+    $this->expectException(\Exception::class);
+
+    $book = factory(Book::class)->create();
+    $user = factory(User::class)->create();
+
+    $book->checkin($user);
+}
+```
+
+Run the test
+
+```text
+...
+1) Tests\Unit\BookReservationsTest::if_not_checked_out_exception_is_thrown
+Failed asserting that exception of type "Error" matches expected exception "Exception". Message was: "Call to a member function update() on null" at
+C:\laragon\www\YouTube\Test-Driven-Laravel\library\app\Book.php:31
+...
+```
+
+Line 31 of Book.php is:
+
+```php
+$reservation->update([
+    'checked_in_at' => now(),
+]);
+```
+
+Basically \$reservation is null, as it wasn't found int eh database
+
+- this can be confirmed by using `dd($reservation)`
+- The quick code method is to add a check if \$reservation is null and throw an exception
+
+```php
+public function checkin($user)
+{
+    $reservation = $this->reservations()->where('user_id', $user->id)
+        ->whereNotNull('checked_out_at')
+        ->whereNull('checked_in_at')
+        ->first();
+
+    // Add this check:
+    if (is_null($reservation)) {
+        throw new \Exception();
+    }
+
+    $reservation->update([
+        'checked_in_at' => now(),
+    ]);
+}
+
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 297 ms, Memory: 20.00 MB
+
+OK (1 test, 1 assertion)
+```
+
+It now passes.
+
+Run all tests
+
+```text
+>vendor\bin\phpunit.bat
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+..............                                                    14 / 14 (100%)
+
+Time: 846 ms, Memory: 24.00 MB
+
+OK (14 tests, 43 assertions)
+```
+
+All tests pass.
+
+Next lesson will create the end points to checkin and checkout books.
 
 ## 05 29:01 Test Driven Laravel - e05 - Book Checkout & Book Checkin Flow Feature Test With TDD - Part 2
 
-https://www.youtube.com/watch?v=CVKRBpBSXEw&list=PLpzy7FIRqpGAbkfdxo1MwOS9xjG3O3z1y&index=5
+<https://www.youtube.com/watch?v=CVKRBpBSXEw&list=PLpzy7FIRqpGAbkfdxo1MwOS9xjG3O3z1y&index=5>
+
 .
