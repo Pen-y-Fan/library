@@ -1,6 +1,6 @@
 # Test Driven Laravel
 
-<!-- cSpell: ignore Laravel beyondcode fideloper nesbot nunomaduro inflector lexer dragonmantank fzaninotto hamcrest filp webmozart erusev parsedown phpoption phpoption vlucas phpdotenv tijsverkoyen egulias swiftmailer swiftmailer paragonie ramsey opis monolog monolog flysystem jakub onderka nikic jakub onderka dnoegel psysh fzaninotto hamcrest filp webmozart phpdocumentor docblock phpunit theseer instantiator phpspec myclabs punycode libsodium PECL ircmaxell moontoast math UUIDs couchdb graylog gelf rollbar ruflin elastica eventable phpseclib webdav ziparchive spatie dropbox srmklive dbal guzzlehttp Mailgun nexmo pheanstalk predis wildbit libedit laragon editorconfig gitattributes gitignore styleci filesystems htaccess Csrf phpcs ruleset cmder Bergmann coderstape prettierrc -->
+<!-- cSpell: ignore Laravel beyondcode fideloper nesbot nunomaduro inflector lexer dragonmantank fzaninotto hamcrest filp webmozart erusev parsedown phpoption phpoption vlucas phpdotenv tijsverkoyen egulias swiftmailer swiftmailer paragonie ramsey opis monolog monolog flysystem jakub onderka nikic jakub onderka dnoegel psysh fzaninotto hamcrest filp webmozart phpdocumentor docblock phpunit theseer instantiator phpspec myclabs punycode libsodium PECL ircmaxell moontoast math UUIDs couchdb graylog gelf rollbar ruflin elastica eventable phpseclib webdav ziparchive spatie dropbox srmklive dbal guzzlehttp Mailgun nexmo pheanstalk predis wildbit libedit laragon editorconfig gitattributes gitignore styleci filesystems htaccess Csrf phpcs ruleset cmder Bergmann coderstape prettierrc endsection tailwindcss enderror Bloggs -->
 
 - [YouTube - Test Driven Laravel by coder's Tape](https://www.youtube.com/playlist?list=PLpzy7FIRqpGAbkfdxo1MwOS9xjG3O3z1y)
 - [Github coderstape library](https://github.com/coderstape/library)
@@ -4503,4 +4503,243 @@ OK (1 test, 2 assertions)
 
 Still green
 
-.
+Next a look at some front end website work with Vue.js and Tailwind CSS.
+
+Laravel ships with the preset of vue and bootstrap.
+
+- run the artisan preset none to remove both vue and bootstrap
+
+```sh
+php artisan preset none
+```
+
+```text
+Frontend scaffolding removed successfully.
+```
+
+App.scss, app.js and bootstrap.js have been emptied or the minimum required is left.
+
+- run the artisan preset vue command to bring in vue
+
+```sh
+php artisan preset vue
+```
+
+```text
+Vue scaffolding installed successfully.
+Please run "npm install && npm run dev" to compile your fresh scaffolding.
+```
+
+**app.js** now has the line `window.Vue = require('vue');`
+
+Run npm install
+
+```sh
+npm install
+```
+
+```text
+...
+added 1001 packages from 477 contributors and audited 17139 packages in 97.134s
+found 0 vulnerabilities
+```
+
+Open <https://tailwindcss.com/docs/installation/>
+
+Follow the documentation
+
+```sh
+npm install tailwindcss -save-dev
+```
+
+```text
+added 15 packages from 52 contributors and audited 17258 packages in 16.721s
+found 0 vulnerabilities
+```
+
+Open **app.scss**
+
+Paste in (from the website)
+
+```scss
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+Continuing from the install doc
+
+- Create a config file (note: np**x** not np**m**)
+
+```sh
+npx tailwind init
+```
+
+```text
+tailwindcss 1.0.5
+
+✅ Created Tailwind config file: tailwind.config.js
+```
+
+- Scroll down to Laravel Mix section, Laravel uses sass.
+- Copy the options({...})
+
+Open webpack.mix.js
+
+```js
+const mix = require("laravel-mix");
+const tailwindcss = require("tailwindcss");
+// ...
+mix
+ .js("resources/js/app.js", "public/js")
+ .sass("resources/sass/app.scss", "public/css")
+ .options({
+  processCssUrls: false,
+  postCss: [tailwindcss("./tailwind.config.js")]
+ });
+```
+
+Run npm run dev
+
+```sh
+npm run dev
+```
+
+This takes a few minutes to run.
+
+```text
+ DONE  Compiled successfully in 9218ms
+
+       Asset     Size   Chunks             Chunk Names
+/css/app.css  481 KiB  /js/app  [emitted]  /js/app
+  /js/app.js  922 KiB  /js/app  [emitted]  /js/app
+```
+
+Open resources\views\layouts\ **app.blade.php**
+
+- Comment out all of the navbar (it contains bootstrap classes)
+- Remove the fonts
+- Change the app.name to Library
+
+Open app\Http\Controllers\ **AuthorsController.php**
+
+- Add a new create method
+- return a view 'authors.create'
+
+```php
+public function create()
+{
+    return view('authors.create');
+}
+```
+
+Create a new file resources\views\authors\ **create.blade.php**
+
+```php
+@extends('layouts.app')
+
+@section('content')
+    <div class="bg-grey-300 h-screen">
+        abcde
+    </div>
+@endsection
+```
+
+Open routes\ **web.php**
+
+```php
+Route::get('/authors/create', 'AuthorsController@create');
+```
+
+Open the browser and navigate to the project <http://youtube.library.test/authors/create>
+
+- If needed run `php artisan serve` and navigate to localhost:8000/authors/create
+
+Open the **create.blade.php**
+
+Follow the tutorial
+
+```php
+@extends('layouts.app')
+
+@section('content')
+    <div class="w-2/3 bg-gray-200 mx-auto p-6 shadow">
+        <form action="/authors" method="post" class="flex flex-col items-center">
+            @csrf
+
+            <h1>Add New Author</h1>
+
+            <div class="pt-4">
+                <input type="text" name="name" placeholder="Full Name" class="rounded px-4 py-2 w-64">
+                @error('name') <p class="text-red-600">{{ $message }}</p> @enderror
+            </div>
+            <div class="pt-4">
+                <input type="text" name="dob" placeholder="Date of Birth" class="rounded px-4 py-2 w-64">
+                @error('dob') <p class="text-red-600">{{ $message }}</p> @enderror
+            </div>
+      1      <div class="pt-4">
+                <button class="bg-blue-400 text-white rounded py-2 px-4">Add New Author</button>
+            </div>
+        </form>
+    </div>
+@endsection
+```
+
+Update the '.env' file
+
+- Remove the mysql settings
+- Add `DB_CONNECTION=sqlite`
+
+```text
+DB_CONNECTION=sqlite
+```
+
+Run artisan migrate
+
+```sh
+php artisan migrate
+```
+
+```text
+Migration table created successfully.
+Migrating: 2014_10_12_000000_create_users_table
+Migrated:  2014_10_12_000000_create_users_table
+Migrating: 2014_10_12_100000_create_password_resets_table
+Migrated:  2014_10_12_100000_create_password_resets_table
+Migrating: 2019_05_06_120614_create_books_table
+Migrated:  2019_05_06_120614_create_books_table
+Migrating: 2019_06_25_110242_create_authors_table
+Migrated:  2019_06_25_110242_create_authors_table
+Migrating: 2019_07_23_104204_create_reservations_table
+Migrated:  2019_07_23_104204_create_reservations_table
+```
+
+Open the browser and navigate to the project <http://youtube.library.test/authors/create>
+
+- Create an author
+
+Navigate to the sqlite database
+
+- F1 open sqlite database
+  - select database.sqlite
+- Sqlite explorer
+  - expand authors
+  - Click the run icon
+
+```json
+{
+ "stmt": "SELECT * FROM `authors`;",
+ "header": ["id", "name", "dob", "created_at", "updated_at"],
+ "rows": [
+  [
+   "1",
+   "Fred Bloggs",
+   "1900-01-01 00:00:00",
+   "2019-07-24 15:29:15",
+   "2019-07-24 15:29:15"
+  ]
+ ]
+}
+```
+
+The data has been added to the database.
