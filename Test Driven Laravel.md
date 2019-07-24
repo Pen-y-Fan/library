@@ -3375,4 +3375,892 @@ Next lesson will create the end points to checkin and checkout books.
 
 <https://www.youtube.com/watch?v=CVKRBpBSXEw&list=PLpzy7FIRqpGAbkfdxo1MwOS9xjG3O3z1y&index=5>
 
+First, run all the test
+
+```text
+C:\laragon\www\YouTube\Test-Driven-Laravel\library>vendor\bin\phpunit.bat
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+..............                                                    14 / 14 (100%)
+
+Time: 674 ms, Memory: 12.00 MB
+
+OK (14 tests, 43 assertions)
+```
+
+All tests pass green.
+
+This lesson will focus on the endpoint for the Book reservation.
+
+First make a test for BookCheckoutTest
+
+```sh
+php artisan make:test BookCheckoutTest
+```
+
+```text
+Test created successfully.
+```
+
+This will be a feature test. Open tests\Feature\ **BookCheckoutTest.php**
+
+- Remove the example test
+- Start a fresh test
+  - Create a book
+  - Create a user and post to /checkout/ with the book id
+  - Copy the assertions from the tests\Unit\ **BookReservationsTest.php** a_book_can_be_checked_out method
+  - Import Book, User and Reservation
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Book;
+use App\User;
+use App\Reservation;
+
+class BookCheckoutTest extends TestCase
+{
+    /** @test */
+    public function a_book_can_be_checked_out_by_a_signed_in_user(): void
+    {
+        $book = factory(Book::class)->create();
+        $user = Factory(User::class)->create();
+
+        $this->actingAs($user)
+            ->post('/checkout/' . $book->id);
+
+        $this->assertCount(1, Reservation::all());
+        $this->assertEquals($user->id, Reservation::first()->user_id);
+        $this->assertEquals($book->id, Reservation::first()->book_id);
+        $this->assertEquals(now(), Reservation::first()->checked_out_at);
+    }
+}
+```
+
+Run the test
+
+```text
+...
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1 no such table: authors
+...
+```
+
+The database hasn't been created
+
+- Add use RefreshDatabase
+
+```php
+// ...
+use RefreshDatabase;
+// ...
+```
+
+Re-run the test
+
+```text
+...
+Failed asserting that actual size 0 matches expected size 1.
+...
+```
+
+The data hasn't been added to the database, but the actual error is being hidden
+
+- Add withoutExceptionHandling
+
+```php
+$this->withoutExceptionHandling();
+```
+
+Re-run the test
+
+```text
+...
+Symfony\Component\HttpKernel\Exception\NotFoundHttpException: POST http://localhost/checkout/1
+...
+```
+
+There is no route for checkout
+
+- Open routes\ **web.php**
+- Create a route for post to /checkout/ and hit the CheckoutBookController store method
+
+```php
+// ...
+Route::post('/checkout/{book}', 'CheckoutBookController@store');
+// ...
+```
+
+Re-run the test
+
+```text
+...
+ReflectionException: Class App\Http\Controllers\CheckoutBookController does not exist
+...
+```
+
+CheckoutBookController hasn't been created
+
+- Create the controller
+
+```sh
+php artisan make:controller CheckoutBookController
+```
+
+```text
+Controller created successfully.
+```
+
+Re-run the test
+
+```text
+...
+BadMethodCallException: Method App\Http\Controllers\CheckoutBookController::store does not exist.
+...
+```
+
+The store method hasn't been created
+
+- Open app\Http\Controllers\ **CheckoutBookController.php**
+- Add a store method
+
+```php
+class CheckoutBookController extends Controller
+{
+    public function store()
+    {
+        // code
+    }
+}
+```
+
+Re-run the test
+
+```text
+...
+Failed asserting that actual size 0 matches expected size 1.
+...
+```
+
+The book hasn't been added to the database
+
+- Use the checkout method from the test
+- The book will passed in as a variable, this can be type hinted to the Book class
+- Import the Book class
+- The user will be the authenticated user
+
+```php
+public function store(Book $book)
+{
+    $book->checkout(auth()->user());
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 688 ms, Memory: 10.00 MB
+
+OK (1 test, 4 assertions)
+```
+
+the test is now green.
+
+The next test is only signed in users can checkout a book.
+
+- Copy the a_book_can_be_checked_out_by_a_signed_in_user test
+- rename only_signed_in_users_can_checkout_a_book
+- Remove the line Exception handling from both tests
+- Remove the acting as authenticated user
+- Add assertRedirect to the login page
+- Assert the database is 0
+
+```php
+//...
+public function a_book_can_be_checked_out_by_a_signed_in_user(): void
+{
+    $this->withoutExceptionHandling(); // Delete
+    //...
+
+/** @test */
+public function only_signed_in_users_can_checkout_a_book(): void
+{
+    $book = factory(Book::class)->create();
+
+    $this->post('/checkout/' . $book->id)
+        ->assertRedirect('/login');
+
+    $this->assertCount(0, Reservation::all());
+}
+// ...
+```
+
+Run the test
+
+```text
+...
+Response status code [500] is not a redirect status code.
+...
+```
+
+Add without exception handling to the test to find the error.
+
+```php
+// ...
+public function only_signed_in_users_can_checkout_a_book(): void
+{
+    $this->withoutExceptionHandling();
+// ...
+```
+
+Re-run the test
+
+```text
+...
+ErrorException: Trying to get property 'id' of non-object
+
+... \library\app\Book.php:19
+...
+```
+
+Open Book.php
+
+- `'user_id' => $user->id,`
+- User is actually null
+- Add a constructor the to CheckoutBookController
+- Use the Laravel middleware('auth')
+
+```php
+// ....
+class CheckoutBookController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
+    public function store(Book $book)
+// ...
+```
+
+Re-run the test
+
+```text
+...
+InvalidArgumentException: Route [login] not defined.
+...
+```
+
+Turn off exception handling and re-run the test again.
+
+```text
+...
+Response status code [500] is not a redirect status code.
+...
+```
+
+To check the routes
+
+- Run the artisan command route:list
+
+```sh
+php artisan route:list
+```
+
+| Domain | Method     | URI             | Name | Action                                            | Middleware   |
+| ------ | ---------- | --------------- | ---- | ------------------------------------------------- | ------------ |
+|        | GET\| HEAD | api/user        |      | Closure                                           | api,auth:api |
+|        | POST       | author          |      | App\Http\Controllers\AuthorsController@store      | web          |
+|        | POST       | books           |      | App\Http\Controllers\BooksController@store        | web          |
+|        | PATCH      | books/{book}    |      | App\Http\Controllers\BooksController@update       | web          |
+|        | DELETE     | books/{book}    |      | App\Http\Controllers\BooksController@destroy      | web          |
+|        | POST       | checkout/{book} |      | App\Http\Controllers\CheckoutBookController@store | web,auth     |
+
+There is no route for login
+
+- run the artisan command make:auth
+
+```sh
+php artisan make:auth
+```
+
+```text
+Authentication scaffolding generated successfully.
+```
+
+Run the artisan route list again
+
+```sh
+php artisan route:list
+```
+
+| Domain | Method    | URI                    | Name             | Action                                                                 | Middleware   |
+| ------ | --------- | ---------------------- | ---------------- | ---------------------------------------------------------------------- | ------------ |
+|        | GET\|HEAD | api/user               |                  | Closure                                                                | api,auth:api |
+|        | POST      | author                 |                  | App\Http\Controllers\AuthorsController@store                           | web          |
+|        |
+|        | POST      | books                  |                  | App\Http\Controllers\BooksController@store                             | web          |
+|        |
+|        | PATCH     | books/{book}           |                  | App\Http\Controllers\BooksController@update                            | web          |
+|        |
+|        | DELETE    | books/{book}           |                  | App\Http\Controllers\BooksController@destroy                           | web          |
+|        |
+|        | POST      | checkout/{book}        |                  | App\Http\Controllers\CheckoutBookController@store                      | web,auth     |
+|        |
+|        | GET\|HEAD | home                   | home             | App\Http\Controllers\HomeController@index                              | web,auth     |
+|        |
+|        | GET\|HEAD | login                  | login            | App\Http\Controllers\Auth\LoginController@showLoginForm                | web,guest    |
+|        |
+|        | POST      | login                  |                  | App\Http\Controllers\Auth\LoginController@login                        | web,guest    |
+|        |
+|        | POST      | logout                 | logout           | App\Http\Controllers\Auth\LoginController@logout                       | web          |
+|        |
+|        | POST      | password/email         | password.email   | App\Http\Controllers\Auth\ForgotPasswordController@sendResetLinkEmail  | web,guest    |
+|        |
+|        | GET\|HEAD | password/reset         | password.request | App\Http\Controllers\Auth\ForgotPasswordController@showLinkRequestForm | web,guest    |
+|        |
+|        | POST      | password/reset         | password.update  | App\Http\Controllers\Auth\ResetPasswordController@reset                | web,guest    |
+|        |
+|        | GET\|HEAD | password/reset/{token} | password.reset   | App\Http\Controllers\Auth\ResetPasswordController@showResetForm        | web,guest    |
+|        |
+|        | GET\|HEAD | register               | register         | App\Http\Controllers\Auth\RegisterController@showRegistrationForm      | web,guest    |
+|        |
+|        | POST      | register               |                  | App\Http\Controllers\Auth\RegisterController@register                  | web,guest    |
+|        |
+
+All the routes for authenticating users are created.
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 663 ms, Memory: 10.00 MB
+
+OK (1 test, 3 assertions)
+```
+
+The test is now green.
+
+Run all tests
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+................                                                  16 / 16 (100%)
+
+Time: 709 ms, Memory: 14.00 MB
+
+OK (16 tests, 50 assertions)
+```
+
+They all pass
+
+Next test a book needs to exist before it can be checked out
+
+- Copy the a_book_can_be_checked_out_by_a_signed_in_user test
+- rename it only_real_books_can_be_checked_out
+- remove the line to create a book
+- post to checkout with a made up book number (123)
+- assert a status code of 404 (not found)
+
+```php
+// ...
+/** @test */
+public function only_real_books_can_be_checked_out(): void
+{
+    $user = Factory(User::class)->create();
+
+    $this->actingAs($user)
+        ->post('/checkout/' . 123) // Book 123 is a made up number
+        ->assertStatus(404);
+
+    $this->assertCount(0, Reservation::all());
+// ...
+}
+```
+
+Run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 610 ms, Memory: 10.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+Next test, based on tests\Unit\ **BookReservationsTest.php**, a_book_can_be_returned
+
+- Copy the test a_book_can_be_checked_out_by_a_signed_in_user
+- Rename it a_book_can_be_checked_in_by_a_signed_in_user
+- Add a new checkin endpoint, passing in the book id
+- Add an additional assertion for checked in at
+
+```php
+// ...
+/** @test */
+public function a_book_can_be_checked_in_by_a_signed_in_user(): void
+{
+    $book = factory(Book::class)->create();
+    $user = Factory(User::class)->create();
+    $this->actingAs($user)
+        ->post('/checkout/' . $book->id);
+
+    $this->actingAs($user)
+        ->post('/checkin/' . $book->id);  // Add
+
+    $this->assertCount(1, Reservation::all());
+    $this->assertEquals($user->id, Reservation::first()->user_id);
+    $this->assertEquals($book->id, Reservation::first()->book_id);
+    $this->assertEquals(now(), Reservation::first()->checked_out_at);
+    $this->assertEquals(now(), Reservation::first()->checked_in_at); // Add
+}
+// ...
+```
+
+Run the test
+
+```text
+...
+null does not match expected type "object".
+
+... tests\Feature\BookCheckoutTest.php:71
+...
+```
+
+Line 71 is the assertion for checked_in_at
+
+- Disable exception handling
+
+```php
+$this->withoutExceptionHandling();
+```
+
+Re-run the test
+
+```text
+...
+Symfony\Component\HttpKernel\Exception\NotFoundHttpException: POST http://localhost/checkin/1
+...
+```
+
+There is no checkin route.
+
+- Create the route in routes\ **web.php**
+- For the /checkin/ route with book and hit the CheckinBookController's store method
+
+```php
+// ...
+Route::post('/checkin/{book}', 'CheckinBookController@store');
+// ...
+
+```
+
+Re-run the test
+
+```text
+...
+ReflectionException: Class App\Http\Controllers\CheckinBookController does not exist
+...
+```
+
+CheckinBookController hasn't been created, yet.
+
+- Run the php artisan command to make controller for CheckinBookController
+
+```sh
+php artisan make:controller CheckinBookController
+```
+
+```text
+Controller created successfully.
+```
+
+Re-run the test
+
+```text
+...
+BadMethodCallException: Method App\Http\Controllers\CheckinBookController::store does not exist.
+...
+```
+
+The store method hasn't been created, yet.
+
+- Open CheckinBookController
+- Create a new method for store
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Book;
+
+class CheckinBookController extends Controller
+{
+    public function store(Book $book)
+    {
+        // code
+    }
+}
+```
+
+Re-run the test
+
+```text
+...
+null does not match expected type "object".
+...
+```
+
+Update the store method
+
+- Based on the unit test `$book->checkin($user);`
+- As with checkout, amend it for `auth()->user();`
+- Type hint Book and import the class
+
+```php
+// ...
+use App\Book;
+// ...
+public function store(Book $book)
+{
+    $book->checkin(auth()->user());
+}
+// ...
+```
+
+Re-run the test.
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 743 ms, Memory: 20.00 MB
+
+OK (1 test, 5 assertions)
+```
+
+Next test
+
+- Only signed in users can checkin a book
+- Copy the checkout version of the same test.
+
+```php
+/** @test */
+public function a_book_can_be_checked_in_by_a_signed_in_user(): void
+{
+    $book = factory(Book::class)->create();
+    $this->post('/checkout/' . $book->id)
+        ->assertRedirect('/login');
+
+    $this->post('/checkin/' . $book->id)
+        ->assertRedirect('/login');
+
+    $this->assertCount(0, Reservation::all());
+    $this->assertEquals($user->id, Reservation::first()->user_id);
+    $this->assertEquals($book->id, Reservation::first()->book_id);
+    $this->assertEquals(now(), Reservation::first()->checked_out_at);
+    $this->assertEquals(now(), Reservation::first()->checked_in_at);
+}
+```
+
+Run the test
+
+```text
+...
+Response status code [500] is not a redirect status code.
+...
+```
+
+To find the real error
+
+- Add without exception handling
+
+```php
+// ...
+$this->withoutExceptionHandling();
+// ...
+```
+
+Re-run the test
+
+```text
+...
+Illuminate\Auth\AuthenticationException: Unauthenticated.
+...
+```
+
+For the book the be created the user needs to be authenticated
+
+- Alter the test so the checkout is acting as a user
+
+```php
+// ...
+$this->actingAs($user)
+    ->post('/checkout/' . $book->id);
+// ...
+```
+
+Re-run the test
+
+```text
+...
+Response status code [200] is not a redirect status code.
+...
+```
+
+As with the CheckoutBookController
+
+- Add a construct
+  - use the middleware auth
+
+```php
+public function __construct()
+{
+    $this->middleware('auth');
+}
+```
+
+Re-run the test
+
+```text
+...
+Response status code [200] is not a redirect status code.
+...
+```
+
+This is unexpected, as the logout isn't actingAs the user. When a user is logged in Laravel keeps the user login.
+
+- Add a logout line after the book has been checked out
+
+```php
+// ...
+Auth::logout();
+// ...
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 332 ms, Memory: 22.00 MB
+
+OK (1 test, 3 assertions)
+```
+
+To check the checked_in_at is Null
+
+- Add an AssertNull for checked_in_at
+
+```php
+// ...
+$this->assertNull(Reservation::first()->checked_in_at);
+// ...
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 332 ms, Memory: 22.00 MB
+
+OK (1 test, 4 assertions)
+```
+
+The test passes.
+
+The next test is only real books can be checked in
+
+```php
+/** @test */
+public function only_real_books_can_be_checked_in(): void
+{
+    $user = Factory(User::class)->create();
+
+    $this->actingAs($user)
+        ->post('/checkin/' . 123)
+        ->assertStatus(404);
+
+    $this->assertCount(0, Reservation::all());
+}
+```
+
+The tutor doesn't think we need to test this, as the book couldn't have been created anyway.
+
+Run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 365 ms, Memory: 22.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+Run the test class
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+......                                                              6 / 6 (100%)
+
+Time: 609 ms, Memory: 22.00 MB
+
+OK (6 tests, 20 assertions)
+```
+
+Run all tests
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+....................                                              20 / 20 (100%)
+
+Time: 787 ms, Memory: 26.00 MB
+
+OK (20 tests, 63 assertions)
+```
+
+Next test, based on the unit test if_not_checked_out_exception_is_thrown
+
+- Create a new test a_404_is_thrown_if_a_book_is_not_checked_out_first
+- Copy the test code from only_signed_in_users_can_checkin_a_book this will be the basis of the test
+- Create a book
+- Create a user
+- Remove the line to checkout
+- Acting as the user checkin the book
+
+```php
+/** @test */
+public function a_404_is_thrown_if_a_book_is_not_checked_out_first(): void
+{
+    $book = factory(Book::class)->create();
+    $user = factory(User::class)->create();
+
+    $this->actingAs($user)
+        ->post('/checkin/' . $book->id)
+        ->assertStatus(404);
+
+    $this->assertCount(0, Reservation::all());
+}
+```
+
+Run the test
+
+```text
+...
+Expected status code 404 but received 500.
+...
+```
+
+As before add
+
+- withoutExceptionHandling
+
+```php
+// ...
+$this->withoutExceptionHandling();
+// ...
+```
+
+Re-run the test
+
+```text
+...
+Exception:
+
+...\library\app\Book.php:32
+...
+```
+
+Book line 32 is:
+
+```php
+throw new \Exception();
+```
+
+Open the **CheckinBookController**, in the store method
+
+- add a try catch block
+- try to checkin the book
+- catch the exception and return a response of 404
+
+```php
+public function store(Book $book)
+{
+    try {
+        $book->checkin(auth()->user());
+    } catch (\Exception $e) {
+        return response([], 404);
+    }
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 301 ms, Memory: 20.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+The test now passes
+
+- Clear the exception handling
+
+Run the test class
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.......                                                             7 / 7 (100%)
+
+Time: 535 ms, Memory: 22.00 MB
+
+OK (7 tests, 22 assertions)
+```
+
+Run all tests
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.....................                                             21 / 21 (100%)
+
+Time: 735 ms, Memory: 26.00 MB
+
+OK (21 tests, 65 assertions)
+```
+
+## 06 28:36 Test Driven Laravel - e06 - Testing Validation, Importing Vue.js & Tailwind CSS
+
 .
