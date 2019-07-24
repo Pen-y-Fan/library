@@ -4263,4 +4263,244 @@ OK (21 tests, 65 assertions)
 
 ## 06 28:36 Test Driven Laravel - e06 - Testing Validation, Importing Vue.js & Tailwind CSS
 
+First start by running all tests
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.....................                                             21 / 21 (100%)
+
+Time: 735 ms, Memory: 26.00 MB
+
+OK (21 tests, 65 assertions).
+```
+
+The AuthorManagementTest has a test for the endpoint of /author, however the same test in the BookManagementTest has an endpoint of Books, to keep things consistent:
+
+- open tests\Feature\ **AuthorManagementTest.php**
+- amend the endpoint from /author to /authors
+
+```php
+// ...
+/** @test */
+public function an_author_can_be_created(): void
+{
+    // Was: /author
+    $this->post('/authors', [
+        'name' => 'Author Name',
+        'dob' => '05/14/1988',
+    ]);
+// ...
+```
+
+Run the test
+
+```text
+...
+Failed asserting that actual size 0 matches expected size 1.
+...
+```
+
+Update the route
+
+- Open routes\ **web.php**
+- Update author to /authors (keeps the routes consistent too)
+
+```php
+Route::post('/authors', 'AuthorsController@store');
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 464 ms, Memory: 18.00 MB
+
+OK (1 test, 3 assertions)
+```
+
+Back in **AuthorManagementTest.php**
+
+Create a data method, same principle as was created data in the BookManagementTest and use array_merge to override parts of the data
+
+```php
+/** @test */
+public function an_author_can_be_created(): void
+{
+    $this->post('/authors', $this->data()); // Change the array with data to private data method
+    // ....
+}
+
+private function data()
+{
+    return [
+        'name' => 'Author Name',
+        'dob' => '05/14/1988',
+    ];
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 349 ms, Memory: 18.00 MB
+
+OK (1 test, 3 assertions)
+```
+
+Still in the **AuthorManagementTest.php**
+
+- Create a new test a_name_is_required
+- Copy the post with data line from the previous test and amend the data using array_merge
+- Override the name filed to an empty string
+- assert the session has errors on name
+
+```php
+/** @test */
+public function a_name_is_required(): void
+{
+    $response = $this->post('/authors', array_merge($this->data(), ['name' => '']));
+
+    $response->assertSessionHasErrors('name');
+}
+```
+
+Run the test
+
+```text
+...
+Session is missing expected key [errors].
+Failed asserting that false is true.
+...
+```
+
+The AuthorsController doesn't currently validate any data.
+
+- Open app\Http\Controllers\ **AuthorsController.php**
+- Add the fields to be validated
+- Create the record based on the validated data
+
+```php
+public function store()
+{
+    $data = request()->validate([
+        'name' => 'required',
+        'dob' => '',
+    ]);
+
+    Author::create($data);
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 372 ms, Memory: 20.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+The test now passes.
+
+Next test a dob is required
+
+- copy the a_name_is_required test
+- rename is a_dob_is_required test
+- change the override to dob
+
+```php
+/** @test */
+public function a_dob_is_required(): void
+{
+    $response = $this->post('/authors', array_merge($this->data(), ['dob' => '']));
+
+    $response->assertSessionHasErrors('dob');
+}
+```
+
+Run the test
+
+```text
+...
+Session is missing expected key [errors].
+...
+```
+
+Open **AuthorsController.php**
+
+- Update the dob to required
+
+```php
+$data = request()->validate([
+    'name' => 'required',
+    'dob' => 'required', // Update
+]);
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 501 ms, Memory: 20.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+It now passes.
+
+In the **BooksController**
+
+- There is a validateRequest protected method, which can be re-used in the class
+
+Open the **AuthorsController.php**
+
+- Create a validateRequest protected method based on the current request()->validate... requirements ...
+- Inline the Author::create with the validateRequest
+
+```php
+class AuthorsController extends Controller
+{
+    public function store()
+    {
+        Author::create($this->validateRequest());
+    }
+
+    protected function validateRequest()
+    {
+        return request()->validate([
+            'name' => 'required',
+            'dob' => 'required',
+        ]);
+    }
+}
+```
+
+Re-run the test
+
+```text
+PHPUnit 7.5.9 by Sebastian Bergmann and contributors.
+
+.                                                                   1 / 1 (100%)
+
+Time: 280 ms, Memory: 20.00 MB
+
+OK (1 test, 2 assertions)
+```
+
+Still green
+
 .
