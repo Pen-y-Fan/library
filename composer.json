@@ -14,12 +14,17 @@
         "laravel/tinker": "^1.0"
     },
     "require-dev": {
+        "barryvdh/laravel-ide-helper": "^2.7",
         "beyondcode/laravel-dump-server": "^1.0",
         "filp/whoops": "^2.0",
         "fzaninotto/faker": "^1.4",
         "mockery/mockery": "^1.0",
         "nunomaduro/collision": "^3.0",
-        "phpunit/phpunit": "^7.5"
+        "phpstan/phpstan": "^0.12.25",
+        "phpstan/phpstan-phpunit": "^0.12.8",
+        "phpunit/phpunit": "^7.5",
+        "rector/rector": "^0.7.26",
+        "symplify/easy-coding-standard": "^7.3"
     },
     "config": {
         "optimize-autoloader": true,
@@ -57,6 +62,15 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
-        ]
+        ],
+        "checkcode": "phpcs app tests --standard=PSR12",
+        "fixcode": "phpcbf app tests --standard=PSR12",
+        "test": "phpunit",
+        "tests": "phpunit",
+        "test-coverage": "phpunit --coverage-html build/coverage",
+        "check-cs": "ecs check app tests --ansi",
+        "fix-cs": "ecs check app tests --fix --ansi",
+        "phpstan": "phpstan analyse --ansi",
+        "rector": "rector process -c rector.yaml --ansi"
     }
 }

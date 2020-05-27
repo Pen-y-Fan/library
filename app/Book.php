@@ -4,6 +4,17 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * App\Book
+ *
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Reservation[] $reservations
+ * @property-read int|null $reservations_count
+ * @property-write mixed $author_id
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Book newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Book newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Book query()
+ * @mixin \Eloquent
+ */
 class Book extends Model
 {
     protected $guarded = ['id'];
